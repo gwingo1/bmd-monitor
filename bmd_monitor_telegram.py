@@ -60,6 +60,37 @@ def search_clinicaltrials():
         return data.get("StudyFieldsResponse", {}).get("StudyFields", [])
     except:
         return []  # API nicht erreichbar → leere Liste zurückgeben
+    
+
+# ---------------------------------------------------------
+# 3b) Medical News (Bing News Search)
+# ---------------------------------------------------------
+def search_medical_news():
+    url = "https://www.bing.com/news/search"
+    params = {
+        "q": "Becker muscular dystrophy OR BMD OR Dystrophinopathy",
+        "form": "NWRFSH",
+        "setlang": "en"
+    }
+
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        html = r.text.lower()
+
+        # Sehr einfacher Filter: wir suchen nach Titeln in <a> Tags
+        results = []
+        for line in html.split("<a"):
+            if "becker" in line or "bmd" in line or "dystrophin" in line:
+                # Titel extrahieren
+                start = line.find(">") + 1
+                end = line.find("<", start)
+                title = line[start:end].strip()
+                if 5 < len(title) < 200:
+                    results.append(title)
+
+        return results[:10]  # nur die ersten 10 News
+    except:
+        return []
 
 
 # ---------------------------------------------------------
@@ -125,6 +156,19 @@ def summarize_results(pubmed, trials):
 
     return message
 
+    # Medical News
+    message += "\n📰 Medizinische Nachrichten:\n"
+    found_news = False
+    for title in news[:10]:
+        relevance = classify_relevance(title)
+        if relevance == "gering":
+            continue
+        found_news = True
+        message += f"- {title} (Relevanz: {relevance})\n"
+
+    if not found_news:
+        message += "- Keine relevanten Nachrichten gefunden.\n"
+
 
 # ---------------------------------------------------------
 # 6) Hauptfunktion
@@ -132,7 +176,9 @@ def summarize_results(pubmed, trials):
 def run_bmd_monitor():
     pubmed = search_pubmed()
     trials = search_clinicaltrials()
-    summary = summarize_results(pubmed, trials)
+    news = search_medical_news()
+
+    summary = summarize_results(pubmed, trials, news)
     send_telegram(summary)
     print("Telegram-Benachrichtigung gesendet.")
 
