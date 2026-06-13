@@ -114,7 +114,7 @@ def classify_relevance(text):
 # ---------------------------------------------------------
 # 5) Zusammenfassung
 # ---------------------------------------------------------
-def summarize_results(pubmed, trials):
+def summarize_results(pubmed, trials, news):
     message = f"BMD Update – {datetime.now().strftime('%d.%m.%Y')}\n\n"
 
     # PubMed
