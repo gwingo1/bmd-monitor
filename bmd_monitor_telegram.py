@@ -147,6 +147,20 @@ def summarize_results(pubmed, trials):
     if not found_trials:
         message += "- Keine neuen relevanten klinischen Studien gefunden.\n"
 
+    # Medical News
+    message += "\n📰 Medizinische Nachrichten:\n"
+    found_news = False
+    for title in news[:10]:
+        relevance = classify_relevance(title)
+        if relevance == "gering":
+            continue
+        found_news = True
+        message += f"- {title} (Relevanz: {relevance})\n"
+
+    if not found_news:
+        message += "- Keine relevanten Nachrichten gefunden.\n"
+
+
     # Fazit
     message += "\n📌 Fazit:\n"
     if found_pubmed or found_trials:
