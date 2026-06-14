@@ -137,7 +137,7 @@ def search_clinicaltrials():
 
 
 # ---------------------------------------------------------
-# GOOGLE NEWS RSS (sauber!)
+# GOOGLE NEWS RSS
 # ---------------------------------------------------------
 
 def search_medical_news():
@@ -153,7 +153,6 @@ def search_medical_news():
             if 10 < len(title) < 200:
                 results.append(title)
 
-        # Duplikate entfernen
         return list(dict.fromkeys(results))[:10]
 
     except Exception as e:
