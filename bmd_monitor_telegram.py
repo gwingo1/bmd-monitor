@@ -101,26 +101,30 @@ def search_medical_news():
     url = "https://www.bing.com/news/search"
     params = {
         "q": "Becker muscular dystrophy OR BMD OR Dystrophinopathy",
-        "form": "NWRFSH",
         "setlang": "en"
     }
 
     try:
         r = requests.get(url, params=params, timeout=10)
-        html = r.text.lower()
+        soup = BeautifulSoup(r.text, "html.parser")
 
         results = []
-        for line in html.split("<a"):
-            if "becker" in line or "bmd" in line or "dystrophin" in line:
-                start = line.find(">") + 1
-                end = line.find("<", start)
-                title = line[start:end].strip()
-                if 5 < len(title) < 200:
-                    results.append(title)
+
+        # Bing News Headlines stehen in <a class="title">
+        for a in soup.find_all("a", {"class": "title"}):
+            title = a.get_text(strip=True)
+            if 10 < len(title) < 200:
+                results.append(title)
+
+        # Duplikate entfernen
+        results = list(dict.fromkeys(results))
 
         return results[:10]
-    except:
+
+    except Exception as e:
+        print("News-Fehler:", e)
         return []
+
 
 
 # ---------------------------------------------------------
@@ -275,5 +279,4 @@ def run_bmd_monitor():
 # ---------------------------------------------------------
 
 if __name__ == "__main__":
-    run_bmd_monitor()
     run_bmd_monitor()
