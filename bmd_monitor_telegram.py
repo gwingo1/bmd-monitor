@@ -242,12 +242,12 @@ def summarize_results(pubmed, semantic, trials, news, orphanet):
     else:
         message += "- Keine neuen Nachrichten.\n"
 
-    message += "\n📚 Orphanet:\n"
-    if orphanet:
-        for o in orphanet:
-            message += f"- {o}\n"
-    else:
-        message += "- Keine neuen Orphanet‑Informationen.\n"
+    message += "\n📚 Orphanet (Krankheitsinformationen):\n"
+if orphanet:
+    for o in orphanet:
+        message += f"- {o}\n"
+else:
+    message += "- Keine neuen Informationen von Orphanet.\n"
 
     return message
 
