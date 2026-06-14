@@ -234,4 +234,23 @@ def run_bmd_monitor():
     new_news = detect_new_items(history["news"], news)
     new_orphanet = detect_new_items(history["orphanet"], orphanet)
 
-    summary = summarize_results(new_pubmed, new
+    summary = summarize_results(new_pubmed, new_semantic, new_trials, new_news, new_orphanet)
+    send_telegram(summary)
+
+    history["pubmed"] = pubmed
+    history["semantic"] = semantic
+    history["trials"] = trials
+    history["news"] = news
+    history["orphanet"] = orphanet
+
+    save_history(history)
+
+    print("Telegram-Benachrichtigung gesendet.")
+
+
+# ---------------------------------------------------------
+# SCRIPT STARTEN
+# ---------------------------------------------------------
+
+if __name__ == "__main__":
+    run_bmd_monitor()
