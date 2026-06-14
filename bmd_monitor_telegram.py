@@ -1,4 +1,4 @@
-import requests
+mport requests
 from datetime import datetime
 
 # ---------------------------------------------------------
@@ -92,6 +92,37 @@ def search_medical_news():
     except:
         return []
 
+from bs4 import BeautifulSoup
+
+# ---------------------------------------------------------
+# 3c) Orphanet (Disease Information, sauber geparst)
+# ---------------------------------------------------------
+def search_orphanet():
+    url = "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=EN&Expert=988"
+
+    try:
+        r = requests.get(url, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        results = []
+
+        # Wir extrahieren die wichtigsten Abschnitte
+        for section in soup.find_all(["p", "h2", "h3"]):
+            text = section.get_text(strip=True)
+            if not text:
+                continue
+
+            # Relevanzfilter direkt hier
+            t = text.lower()
+            if any(k in t for k in ["becker", "dystrophin", "muscular", "x-linked"]):
+                if 30 < len(text) < 400:
+                    results.append(text)
+
+        return results[:5]  # die 5 wichtigsten Abschnitte
+    except Exception as e:
+        print("Orphanet-Fehler:", e)
+        return []
+
 
 # ---------------------------------------------------------
 # 4) Relevanzfilter
@@ -183,6 +214,20 @@ def summarize_results(pubmed, trials, news):
     if not found_news:
         message += "- Keine relevanten Nachrichten gefunden.\n"
 
+        # Orphanet
+    message += "\n📚 Orphanet – Krankheitsinformationen:\n"
+    found_orpha = False
+    for text in orphanet[:5]:
+        relevance = classify_relevance(text)
+        if relevance == "gering":
+            continue
+        found_orpha = True
+        message += f"- {text} (Relevanz: {relevance})\n"
+
+    if not found_orpha:
+        message += "- Keine relevanten Orphanet-Informationen gefunden.\n"
+    
+
 
 # ---------------------------------------------------------
 # 6) Hauptfunktion
@@ -191,10 +236,12 @@ def run_bmd_monitor():
     pubmed = search_pubmed()
     trials = search_clinicaltrials()
     news = search_medical_news()
+    orphanet = search_orphanet()
 
-    summary = summarize_results(pubmed, trials, news)
+    summary = summarize_results(pubmed, trials, news, orphanet)
     send_telegram(summary)
     print("Telegram-Benachrichtigung gesendet.")
+
 
 
 # ---------------------------------------------------------
