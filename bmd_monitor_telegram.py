@@ -213,13 +213,44 @@ def detect_new_items(old_list, new_list):
 def summarize_results(pubmed, semantic, trials, news, orphanet):
     message = "🧬 *Neue Entwicklungen seit dem letzten Lauf:*\n\n"
 
-    message += "🧬 PubMed:\n" + ("\n".join(f"- {p}" for p in pubmed) if pubmed else "- Keine neuen Studien.") + "\n\n"
-    message += "📘 Semantic Scholar:\n" + ("\n".join(f"- {s}" for s in semantic) if semantic else "- Keine neuen Paper.") + "\n\n"
-    message += "🧪 ClinicalTrials:\n" + ("\n".join(f"- {t}" for t in trials) if trials else "- Keine neuen Trials.") + "\n\n"
-    message += "📰 News:\n" + ("\n".join(f"- {n}" for n in news) if news else "- Keine neuen Nachrichten.") + "\n\n"
-    message += "📚 Orphanet:\n" + ("\n".join(f"- {o}" for o in orphanet) if orphanet else "- Keine neuen Orphanet-Informationen.") + "\n"
+    # PubMed
+    message += "🧬 PubMed:\n"
+    if pubmed:
+        for p in pubmed:
+            message += f"- {p}\n"
+    else:
+        message += "- Keine neuen Studien.\n"
+
+    message += "\n📘 Semantic Scholar:\n"
+    if semantic:
+        for s in semantic:
+            message += f"- {s}\n"
+    else:
+        message += "- Keine neuen wissenschaftlichen Veröffentlichungen.\n"
+
+    message += "\n🧪 Klinische Studien (ClinicalTrials):\n"
+    if trials:
+        for t in trials:
+            message += f"- {t}\n"
+    else:
+        message += "- Keine neuen klinischen Studien.\n"
+
+    message += "\n📰 Nachrichten:\n"
+    if news:
+        for n in news:
+            message += f"- {n}\n"
+    else:
+        message += "- Keine neuen Nachrichten.\n"
+
+    message += "\n📚 Orphanet:\n"
+    if orphanet:
+        for o in orphanet:
+            message += f"- {o}\n"
+    else:
+        message += "- Keine neuen Orphanet‑Informationen.\n"
 
     return message
+
 
 
 # ---------------------------------------------------------
