@@ -1,6 +1,21 @@
 import requests
 from datetime import datetime
 
+import json
+import os
+
+def load_history():
+    if not os.path.exists("history.json"):
+        return {"pubmed": [], "trials": [], "news": [], "orphanet": []}
+
+    with open("history.json", "r") as f:
+        return json.load(f)
+
+def save_history(history):
+    with open("history.json", "w") as f:
+        json.dump(history, f, indent=2)
+
+
 # ---------------------------------------------------------
 # 1) Telegram Push
 # ---------------------------------------------------------
@@ -146,50 +161,41 @@ def classify_relevance(text):
 # 5) Zusammenfassung
 # ---------------------------------------------------------
 def summarize_results(pubmed, trials, news, orphanet):
-    message = f"BMD Update – {datetime.now().strftime('%d.%m.%Y')}\n\n"
+    message = "🧬 *Neue Entwicklungen seit dem letzten Lauf:*\n\n"
 
     # PubMed
-    message += "🧬 Neue wissenschaftliche Studien:\n"
-    found_pubmed = False
-    for rec in pubmed[:10]:
-        title = rec.get("title", "")
-        relevance = classify_relevance(title)
-        if relevance == "gering":
-            continue
-        found_pubmed = True
-        message += f"- {title} (Relevanz: {relevance})\n"
-
-    if not found_pubmed:
-        message += "- Keine neuen relevanten Studien gefunden.\n"
+    message += "🧬 PubMed:\n"
+    if pubmed:
+        for p in pubmed:
+            message += f"- {p}\n"
+    else:
+        message += "- Keine neuen Studien.\n"
 
     # ClinicalTrials
-    message += "\n🧪 Neue klinische Studien:\n"
-    found_trials = False
-    for s in trials[:10]:
-        title = s.get("BriefTitle", [""])[0]
-        relevance = classify_relevance(title)
-        if relevance == "gering":
-            continue
-        found_trials = True
-        status = s.get("Status", [""])[0]
-        nct = s.get("NCTId", [""])[0]
-        message += f"- {title} (Status: {status}, NCT: {nct}, Relevanz: {relevance})\n"
+    message += "\n🧪 ClinicalTrials:\n"
+    if trials:
+        for t in trials:
+            message += f"- {t}\n"
+    else:
+        message += "- Keine neuen Trials.\n"
 
-    if not found_trials:
-        message += "- Keine neuen relevanten klinischen Studien gefunden.\n"
-
-    # Medical News
+    # News
     message += "\n📰 Medizinische Nachrichten:\n"
-    found_news = False
-    for title in news[:10]:
-        relevance = classify_relevance(title)
-        if relevance == "gering":
-            continue
-        found_news = True
-        message += f"- {title} (Relevanz: {relevance})\n"
+    if news:
+        for n in news:
+            message += f"- {n}\n"
+    else:
+        message += "- Keine neuen Nachrichten.\n"
 
-    if not found_news:
-        message += "- Keine relevanten Nachrichten gefunden.\n"
+    # Orphanet
+    message += "\n📚 Orphanet:\n"
+    if orphanet:
+        for o in orphanet:
+            message += f"- {o}\n"
+    else:
+        message += "- Keine neuen Orphanet-Informationen.\n"
+
+    return message
 
 
     # Fazit
@@ -233,14 +239,43 @@ def summarize_results(pubmed, trials, news, orphanet):
 # 6) Hauptfunktion
 # ---------------------------------------------------------
 def run_bmd_monitor():
+    # Alte Ergebnisse laden
+    history = load_history()
+
+    # Neue Ergebnisse abrufen
     pubmed = search_pubmed()
     trials = search_clinicaltrials()
     news = search_medical_news()
     orphanet = search_orphanet()
 
-    summary = summarize_results(pubmed, trials, news, orphanet)
+    # Nur die Titel extrahieren (falls nötig)
+    pubmed_titles = pubmed
+    trial_titles = trials
+    news_titles = news
+    orphanet_texts = orphanet
+
+    # Neue Einträge erkennen
+    new_pubmed = detect_new_items(history["pubmed"], pubmed_titles)
+    new_trials = detect_new_items(history["trials"], trial_titles)
+    new_news = detect_new_items(history["news"], news_titles)
+    new_orphanet = detect_new_items(history["orphanet"], orphanet_texts)
+
+    # Zusammenfassung erzeugen
+    summary = summarize_results(new_pubmed, new_trials, new_news, new_orphanet)
+
+    # Telegram senden
     send_telegram(summary)
+
+    # History aktualisieren
+    history["pubmed"] = pubmed_titles
+    history["trials"] = trial_titles
+    history["news"] = news_titles
+    history["orphanet"] = orphanet_texts
+
+    save_history(history)
+
     print("Telegram-Benachrichtigung gesendet.")
+
 
 
 
