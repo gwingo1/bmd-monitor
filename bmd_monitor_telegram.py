@@ -8,7 +8,6 @@ from bs4 import BeautifulSoup
 # ---------------------------------------------------------
 
 def load_history():
-    # Falls Datei nicht existiert → neue Struktur erzeugen
     if not os.path.exists("history.json"):
         return {
             "pubmed": [],
@@ -18,11 +17,9 @@ def load_history():
             "orphanet": []
         }
 
-    # Datei laden
     with open("history.json", "r") as f:
         history = json.load(f)
 
-    # Falls alte Datei ohne "semantic" → hinzufügen
     if "semantic" not in history:
         history["semantic"] = []
 
@@ -144,7 +141,7 @@ def search_clinicaltrials():
 
 
 # ---------------------------------------------------------
-# GOOGLE NEWS RSS (HTML Parser – funktioniert überall)
+# GOOGLE NEWS RSS (HTML Parser)
 # ---------------------------------------------------------
 
 def search_medical_news():
@@ -152,7 +149,7 @@ def search_medical_news():
 
     try:
         r = requests.get(url, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")  # HTML statt XML
+        soup = BeautifulSoup(r.text, "html.parser")
 
         results = []
         for item in soup.find_all("item"):
@@ -184,4 +181,83 @@ def search_orphanet():
 
         results = []
 
-        for section in soup.find_all(["p", "
+        for section in soup.find_all(["p", "h2", "h3"]):
+            text = section.get_text(strip=True)
+            if not text:
+                continue
+
+            t = text.lower()
+            if any(k in t for k in ["becker", "dystrophin", "muscular", "x-linked"]):
+                if 30 < len(text) < 400:
+                    results.append(text)
+
+        return results[:5]
+
+    except Exception as e:
+        print("Orphanet-Fehler:", e)
+        return []
+
+
+# ---------------------------------------------------------
+# NEUE EINTRÄGE ERKENNEN
+# ---------------------------------------------------------
+
+def detect_new_items(old_list, new_list):
+    return [item for item in new_list if item not in old_list]
+
+
+# ---------------------------------------------------------
+# ZUSAMMENFASSUNG
+# ---------------------------------------------------------
+
+def summarize_results(pubmed, semantic, trials, news, orphanet):
+    message = "🧬 *Neue Entwicklungen seit dem letzten Lauf:*\n\n"
+
+    message += "🧬 PubMed:\n" + ("\n".join(f"- {p}" for p in pubmed) if pubmed else "- Keine neuen Studien.") + "\n\n"
+    message += "📘 Semantic Scholar:\n" + ("\n".join(f"- {s}" for s in semantic) if semantic else "- Keine neuen Paper.") + "\n\n"
+    message += "🧪 ClinicalTrials:\n" + ("\n".join(f"- {t}" for t in trials) if trials else "- Keine neuen Trials.") + "\n\n"
+    message += "📰 News:\n" + ("\n".join(f"- {n}" for n in news) if news else "- Keine neuen Nachrichten.") + "\n\n"
+    message += "📚 Orphanet:\n" + ("\n".join(f"- {o}" for o in orphanet) if orphanet else "- Keine neuen Orphanet-Informationen.") + "\n"
+
+    return message
+
+
+# ---------------------------------------------------------
+# HAUPTFUNKTION
+# ---------------------------------------------------------
+
+def run_bmd_monitor():
+    history = load_history()
+
+    pubmed = search_pubmed()
+    semantic = search_semantic_scholar()
+    trials = search_clinicaltrials()
+    news = search_medical_news()
+    orphanet = search_orphanet()
+
+    new_pubmed = detect_new_items(history["pubmed"], pubmed)
+    new_semantic = detect_new_items(history["semantic"], semantic)
+    new_trials = detect_new_items(history["trials"], trials)
+    new_news = detect_new_items(history["news"], news)
+    new_orphanet = detect_new_items(history["orphanet"], orphanet)
+
+    summary = summarize_results(new_pubmed, new_semantic, new_trials, new_news, new_orphanet)
+    send_telegram(summary)
+
+    history["pubmed"] = pubmed
+    history["semantic"] = semantic
+    history["trials"] = trials
+    history["news"] = news
+    history["orphanet"] = orphanet
+
+    save_history(history)
+
+    print("Telegram-Benachrichtigung gesendet.")
+
+
+# ---------------------------------------------------------
+# SCRIPT STARTEN
+# ---------------------------------------------------------
+
+if __name__ == "__main__":
+    run_bmd_monitor()
