@@ -31,8 +31,8 @@ def save_history(history):
 # TELEGRAM PUSH
 # ---------------------------------------------------------
 
-TOKEN = "8731047806:AAF9wgMqNyuDJi--gkC4sWqZfXCBdWre_t8"
-CHAT_ID = "798837741"
+TOKEN = "TELEGRAM_TOKEN"
+CHAT_ID = "TELEGRAM_CHAT_ID"
 
 def send_telegram(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
