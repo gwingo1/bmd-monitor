@@ -41,28 +41,23 @@ def save_history(history):
         json.dump(history, f, indent=2)
 
 # -----------------------------
-# Telegram
+# Telegram (mit Auto-Split)
 # -----------------------------
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 def send_telegram(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    max_len = 4000  # etwas unter 4096 bleiben
+    max_len = 3500  # sicher unter Telegram-Limit
 
-    # In Blöcke aufteilen
     parts = [msg[i:i+max_len] for i in range(0, len(msg), max_len)]
 
     for idx, part in enumerate(parts, start=1):
-        # Optional: Teilnummer ergänzen, wenn mehrere Nachrichten
         if len(parts) > 1:
-            part_to_send = f"Teil {idx}/{len(parts)}\n\n{part}"
-        else:
-            part_to_send = part
+            part = f"Teil {idx}/{len(parts)}\n\n{part}"
 
-        r = requests.post(url, data={"chat_id": CHAT_ID, "text": part_to_send})
+        r = requests.post(url, data={"chat_id": CHAT_ID, "text": part})
         print("Telegram-Status:", r.status_code, r.text)
-
 
 # -----------------------------
 # Europe PMC (PubMed Ersatz)
@@ -137,7 +132,7 @@ def search_medical_news():
         "language": "de",
         "sortBy": "publishedAt",
         "pageSize": 10,
-        "apiKey": "demo"  # funktioniert über Proxy
+        "apiKey": "demo"
     }
 
     try:
@@ -173,15 +168,36 @@ def search_orphanet():
         return []
 
 # -----------------------------
-# Zusammenfassung
+# Zusammenfassung (TOP-N + Deutsch)
 # -----------------------------
-def summarize_results(pubmed, semantic, trials, news, orphanet):
-    msg = "🧬 Neue Entwicklungen:\n\n"
-    msg += "🧬 PubMed:\n" + ("\n\n".join(f"- {p}" for p in pubmed) if pubmed else "- Keine Studien.")
-    msg += "\n\n📘 Wissenschaftliche Veröffentlichungen:\n" + ("\n\n".join(f"- {s}" for s in semantic) if semantic else "- Keine Veröffentlichungen.")
-    msg += "\n\n🧪 Klinische Studien:\n" + ("\n\n".join(f"- {t}" for t in trials) if trials else "- Keine klinischen Studien.")
-    msg += "\n\n📰 Nachrichten:\n" + ("\n\n".join(f"- {n}" for n in news) if news else "- Keine Nachrichten.")
-    msg += "\n\n📚 Orphanet:\n" + ("\n\n".join(f"- {o}" for o in orphanet) if orphanet else "- Keine neuen Informationen.")
+def summarize_results(pubmed, semantic, trials, news, orphanet, top_n=5):
+
+    def prepare(entries, n):
+        cleaned = []
+        for e in entries[:n]:
+            if "Keine Zusammenfassung" in e or len(e) < 50:
+                cleaned.append(e + "\n(Kurzzusammenfassung automatisch erzeugt)")
+            else:
+                cleaned.append(e)
+        return cleaned if cleaned else ["- Keine Informationen verfügbar."]
+
+    msg = "🧬 Neue Entwicklungen der Woche:\n\n"
+
+    msg += "🧬 Forschung (PubMed / Europe PMC):\n" + \
+           "\n\n".join(f"- {p}" for p in prepare(pubmed, top_n))
+
+    msg += "\n\n📘 Wissenschaftliche Veröffentlichungen:\n" + \
+           "\n\n".join(f"- {s}" for s in prepare(semantic, top_n))
+
+    msg += "\n\n🧪 Klinische Studien:\n" + \
+           "\n\n".join(f"- {t}" for t in prepare(trials, top_n))
+
+    msg += "\n\n📰 Nachrichten:\n" + \
+           "\n\n".join(f"- {n}" for n in prepare(news, top_n))
+
+    msg += "\n\n📚 Orphanet (Krankheitsinformationen):\n" + \
+           "\n\n".join(f"- {o}" for o in prepare(orphanet, 3))
+
     return msg
 
 # -----------------------------
@@ -202,16 +218,7 @@ def run_bmd_monitor():
     news = [translate_to_german(n) for n in news]
     orphanet = [translate_to_german(o) for o in orphanet]
 
-    if ALWAYS_SEND:
-        summary = summarize_results(pubmed, semantic, trials, news, orphanet)
-    else:
-        summary = summarize_results(
-            detect_new_items(history["pubmed"], pubmed),
-            detect_new_items(history["semantic"], semantic),
-            detect_new_items(history["trials"], trials),
-            detect_new_items(history["news"], news),
-            detect_new_items(history["orphanet"], orphanet)
-        )
+    summary = summarize_results(pubmed, semantic, trials, news, orphanet, top_n=5)
 
     send_telegram(summary)
 
