@@ -2,6 +2,11 @@ import requests
 import json
 import os
 from bs4 import BeautifulSoup
+import warnings
+from bs4 import XMLParsedAsHTMLWarning
+
+# XML-Warnungen unterdrücken
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 # -----------------------------
 # Übersetzungsfunktion
@@ -23,19 +28,32 @@ def translate_to_german(text):
         return text
 
 # -----------------------------
-# History laden / speichern
+# History laden / reparieren
 # -----------------------------
 def load_history():
+    default = {
+        "pubmed": [],
+        "semantic": [],
+        "trials": [],
+        "news": [],
+        "orphanet": []
+    }
+
     if not os.path.exists("history.json"):
-        return {
-            "pubmed": [],
-            "semantic": [],
-            "trials": [],
-            "news": [],
-            "orphanet": []
-        }
-    with open("history.json", "r") as f:
-        return json.load(f)
+        return default
+
+    try:
+        with open("history.json", "r") as f:
+            data = json.load(f)
+    except:
+        return default
+
+    # Fehlende Schlüssel automatisch ergänzen
+    for key in default:
+        if key not in data:
+            data[key] = []
+
+    return data
 
 def save_history(history):
     with open("history.json", "w") as f:
@@ -55,7 +73,7 @@ def send_telegram(msg):
         print("Fehler beim Senden an Telegram:", e)
 
 # -----------------------------
-# Datenquellen
+# PubMed
 # -----------------------------
 def search_pubmed():
     url = "https://api.ncbi.nlm.nih.gov/lit/ctxp/v1/pubmed/"
@@ -66,92 +84,126 @@ def search_pubmed():
         '"Dystrophinopathy"',
         '"gene therapy" AND "dystrophin"'
     ]
-    titles = []
+    results = []
+
     for q in queries:
         try:
             r = requests.get(url, params={"format": "json", "term": q}, timeout=10)
             data = r.json()
+
             for rec in data.get("records", []):
                 title = rec.get("title")
-                if title and title not in titles:
-                    titles.append(title)
+                pmid = rec.get("pmid")
+                abstract = rec.get("abstract", "")
+                snippet = abstract[:300] + "..." if abstract else "Keine Zusammenfassung verfügbar."
+
+                link = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else "Kein Link verfügbar"
+
+                results.append(f"{title}\n{snippet}\n🔗 {link}")
         except:
             continue
-    return titles
 
+    return results
+
+# -----------------------------
+# Semantic Scholar
+# -----------------------------
 def search_semantic_scholar():
     url = "https://api.semanticscholar.org/graph/v1/paper/search"
     params = {
         "query": "Becker muscular dystrophy OR BMD OR Dystrophinopathy",
         "limit": 20,
-        "fields": "title,year"
+        "fields": "title,year,url,abstract"
     }
+
     try:
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
         results = []
+
         for paper in data.get("data", []):
             title = paper.get("title")
             year = paper.get("year")
-            if title:
-                results.append(f"{title} ({year})")
+            link = paper.get("url", "Kein Link")
+            abstract = paper.get("abstract", "")
+            snippet = abstract[:300] + "..." if abstract else "Keine Zusammenfassung verfügbar."
+
+            results.append(f"{title} ({year})\n{snippet}\n🔗 {link}")
+
         return results
     except:
         return []
 
+# -----------------------------
+# ClinicalTrials
+# -----------------------------
 def search_clinicaltrials():
     url = "https://clinicaltrials.gov/api/query/study_fields"
     params = {
         "expr": "Becker muscular dystrophy OR BMD OR Dystrophinopathy",
-        "fields": "BriefTitle,Phase,Status",
+        "fields": "BriefTitle,Phase,Status,StudyPageLink,BriefSummary",
         "min_rnk": 1,
         "max_rnk": 50,
         "fmt": "json"
     }
+
     try:
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
         results = []
+
         for t in data.get("StudyFieldsResponse", {}).get("StudyFields", []):
             title = t.get("BriefTitle", [""])[0]
             phase = t.get("Phase", [""])[0]
             status = t.get("Status", [""])[0]
-            results.append(f"{title} – Phase {phase}, Status: {status}")
+            link = t.get("StudyPageLink", [""])[0]
+            summary = t.get("BriefSummary", ["Keine Beschreibung verfügbar."])[0]
+            snippet = summary[:300] + "..."
+
+            results.append(f"{title}\nPhase: {phase}, Status: {status}\n{snippet}\n🔗 {link}")
+
         return results
     except:
         return []
 
+# -----------------------------
+# Google News
+# -----------------------------
 def search_medical_news():
     url = "https://news.google.com/rss/search?q=Becker+muscular+dystrophy+BMD+Dystrophinopathy&hl=de&gl=DE&ceid=DE:de"
     try:
         r = requests.get(url, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
+        soup = BeautifulSoup(r.text, "xml")
         results = []
+
         for item in soup.find_all("item"):
-            title_tag = item.find("title")
-            if not title_tag:
-                continue
-            title = title_tag.get_text(strip=True)
-            if 10 < len(title) < 200:
-                results.append(title)
-        return list(dict.fromkeys(results))[:10]
+            title = item.title.get_text(strip=True)
+            link = item.link.get_text(strip=True)
+            source = item.source.get_text(strip=True) if item.source else "Unbekannte Quelle"
+            date = item.pubDate.get_text(strip=True) if item.pubDate else "Kein Datum"
+
+            results.append(f"{title}\nQuelle: {source}, Datum: {date}\n🔗 {link}")
+
+        return results[:10]
     except:
         return []
 
+# -----------------------------
+# Orphanet
+# -----------------------------
 def search_orphanet():
     url = "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=DE&Expert=988"
     try:
         r = requests.get(url, timeout=10)
         soup = BeautifulSoup(r.text, "html.parser")
         results = []
-        for section in soup.find_all(["p", "h2", "h3"]):
+
+        for section in soup.find_all("p"):
             text = section.get_text(strip=True)
-            if not text:
-                continue
-            t = text.lower()
-            if any(k in t for k in ["becker", "dystrophin", "muskeldystrophie", "x-chromosomal"]):
-                if 30 < len(text) < 400:
-                    results.append(text)
+            if len(text) > 80 and "Becker" in text:
+                snippet = text[:300] + "..."
+                results.append(f"{snippet}\n🔗 {url}")
+
         return results[:5]
     except:
         return []
@@ -167,11 +219,11 @@ def detect_new_items(old_list, new_list):
 # -----------------------------
 def summarize_results(pubmed, semantic, trials, news, orphanet):
     msg = "🧬 Neue Entwicklungen seit dem letzten Lauf:\n\n"
-    msg += "🧬 PubMed:\n" + ("\n".join(f"- {p}" for p in pubmed) if pubmed else "- Keine neuen Studien.")
-    msg += "\n\n📘 Semantic Scholar:\n" + ("\n".join(f"- {s}" for s in semantic) if semantic else "- Keine neuen wissenschaftlichen Veröffentlichungen.")
-    msg += "\n\n🧪 Klinische Studien:\n" + ("\n".join(f"- {t}" for t in trials) if trials else "- Keine neuen klinischen Studien.")
-    msg += "\n\n📰 Nachrichten:\n" + ("\n".join(f"- {n}" for n in news) if news else "- Keine neuen Nachrichten.")
-    msg += "\n\n📚 Orphanet (Krankheitsinformationen):\n" + ("\n".join(f"- {o}" for o in orphanet) if orphanet else "- Keine neuen Informationen von Orphanet.")
+    msg += "🧬 PubMed:\n" + ("\n\n".join(f"- {p}" for p in pubmed) if pubmed else "- Keine neuen Studien.")
+    msg += "\n\n📘 Semantic Scholar:\n" + ("\n\n".join(f"- {s}" for s in semantic) if semantic else "- Keine neuen wissenschaftlichen Veröffentlichungen.")
+    msg += "\n\n🧪 Klinische Studien:\n" + ("\n\n".join(f"- {t}" for t in trials) if trials else "- Keine neuen klinischen Studien.")
+    msg += "\n\n📰 Nachrichten:\n" + ("\n\n".join(f"- {n}" for n in news) if news else "- Keine neuen Nachrichten.")
+    msg += "\n\n📚 Orphanet (Krankheitsinformationen):\n" + ("\n\n".join(f"- {o}" for o in orphanet) if orphanet else "- Keine neuen Informationen von Orphanet.")
     return msg
 
 # -----------------------------
@@ -187,7 +239,7 @@ def run_bmd_monitor():
     news = search_medical_news()
     orphanet = search_orphanet()
 
-    # ALLES einzeln übersetzen
+    # Übersetzen
     pubmed = [translate_to_german(p) for p in pubmed]
     semantic = [translate_to_german(s) for s in semantic]
     trials = [translate_to_german(t) for t in trials]
@@ -203,7 +255,7 @@ def run_bmd_monitor():
         detect_new_items(history["orphanet"], orphanet)
     )
 
-    # Zusammenfassung selbst auch übersetzen
+    # Zusammenfassung selbst übersetzen
     summary = translate_to_german(summary)
 
     # Senden
