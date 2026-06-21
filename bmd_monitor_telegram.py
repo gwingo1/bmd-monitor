@@ -266,6 +266,12 @@ def run_bmd_monitor():
 
     save_history(history)
     print("Telegram-Benachrichtigung gesendet.")
+    print("DEBUG PubMed:", len(pubmed))
+    print("DEBUG Semantic:", len(semantic))
+    print("DEBUG Trials:", len(trials))
+    print("DEBUG News:", len(news))
+    print("DEBUG Orphanet:", len(orphanet))
+
 
 # -----------------------------
 # Startpunkt
