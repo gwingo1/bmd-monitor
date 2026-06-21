@@ -259,9 +259,23 @@ def run_bmd_monitor():
     # Zusammenfassung selbst übersetzen
     summary = translate_to_german(summary)
 
-    # Senden
-    if ALWAYS_SEND or any([pubmed_new, semantic_new, trials_new, news_new, orphanet_new]):     send_telegram(summary) else:     print("Keine neuen Einträge – Nachricht nicht gesendet.")
+    # Neue Einträge erkennen
+pubmed_new = detect_new_items(history["pubmed"], pubmed)
+semantic_new = detect_new_items(history["semantic"], semantic)
+trials_new = detect_new_items(history["trials"], trials)
+news_new = detect_new_items(history["news"], news)
+orphanet_new = detect_new_items(history["orphanet"], orphanet)
 
+# Zusammenfassung erstellen
+summary = summarize_results(pubmed_new, semantic_new, trials_new, news_new, orphanet_new)
+summary = translate_to_german(summary)
+
+# Nachricht senden (Testmodus oder echte neue Einträge)
+if ALWAYS_SEND or any([pubmed_new, semantic_new, trials_new, news_new, orphanet_new]):
+    send_telegram(summary)
+else:
+    print("Keine neuen Einträge – Nachricht nicht gesendet.")
+    
     # History aktualisieren
     history["pubmed"] = pubmed
     history["semantic"] = semantic
