@@ -260,7 +260,7 @@ def run_bmd_monitor():
     summary = translate_to_german(summary)
 
     # Senden
-    send_telegram(summary)
+    if ALWAYS_SEND or any([pubmed_new, semantic_new, trials_new, news_new, orphanet_new]):     send_telegram(summary) else:     print("Keine neuen Einträge – Nachricht nicht gesendet.")
 
     # History aktualisieren
     history["pubmed"] = pubmed
