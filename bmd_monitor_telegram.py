@@ -48,8 +48,21 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 def send_telegram(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    r = requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
-    print("Telegram-Status:", r.status_code, r.text)
+    max_len = 4000  # etwas unter 4096 bleiben
+
+    # In Blöcke aufteilen
+    parts = [msg[i:i+max_len] for i in range(0, len(msg), max_len)]
+
+    for idx, part in enumerate(parts, start=1):
+        # Optional: Teilnummer ergänzen, wenn mehrere Nachrichten
+        if len(parts) > 1:
+            part_to_send = f"Teil {idx}/{len(parts)}\n\n{part}"
+        else:
+            part_to_send = part
+
+        r = requests.post(url, data={"chat_id": CHAT_ID, "text": part_to_send})
+        print("Telegram-Status:", r.status_code, r.text)
+
 
 # -----------------------------
 # Europe PMC (PubMed Ersatz)
