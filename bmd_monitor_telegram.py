@@ -3,6 +3,22 @@ import json
 import os
 from bs4 import BeautifulSoup
 
+def translate_to_german(text):
+    try:
+        r = requests.post(
+            "https://libretranslate.de/translate",
+            data={
+                "q": text,
+                "source": "auto",
+                "target": "de",
+                "format": "text"
+            },
+            timeout=10
+        )
+        return r.json().get("translatedText", text)
+    except:
+        return text
+
 # ---------------------------------------------------------
 # HISTORY LADEN / SPEICHERN
 # ---------------------------------------------------------
@@ -76,7 +92,7 @@ def search_pubmed():
             continue
 
     return titles
-
+pubmed = [translate_to_german(p) for p in pubmed]
 
 # ---------------------------------------------------------
 # SEMANTIC SCHOLAR API
@@ -106,6 +122,7 @@ def search_semantic_scholar():
     except Exception as e:
         print("Semantic Scholar Fehler:", e)
         return []
+semantic = [translate_to_german(s) for s in semantic]
 
 
 # ---------------------------------------------------------
@@ -138,6 +155,7 @@ def search_clinicaltrials():
 
     except:
         return []
+trials = [translate_to_german(t) for t in trials]
 
 
 # ---------------------------------------------------------
@@ -166,6 +184,7 @@ def search_medical_news():
     except Exception as e:
         print("News-Fehler:", e)
         return []
+news = [translate_to_german(n) for n in news]
 
 
 # ---------------------------------------------------------
@@ -196,6 +215,7 @@ def search_orphanet():
     except Exception as e:
         print("Orphanet-Fehler:", e)
         return []
+orphanet = [translate_to_german(o) for o in orphanet]
 
 
 # ---------------------------------------------------------
@@ -242,7 +262,8 @@ def run_bmd_monitor():
     new_orphanet = detect_new_items(history["orphanet"], orphanet)
 
     summary = summarize_results(new_pubmed, new_semantic, new_trials, new_news, new_orphanet)
-    send_telegram(summary)
+    send_telegram(translate_to_german(summary))
+
 
     history["pubmed"] = pubmed
     history["semantic"] = semantic
