@@ -273,6 +273,10 @@ def run_bmd_monitor():
 
     save_history(history)
     print("Telegram-Benachrichtigung gesendet.")
-    if __name__ == "__main__":
+  # -----------------------------
+# Startpunkt
+# -----------------------------
+if __name__ == "__main__":
     run_bmd_monitor()
+
 
