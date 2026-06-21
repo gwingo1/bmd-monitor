@@ -1,4 +1,5 @@
 ALWAYS_SEND = True
+
 import requests
 import json
 import os
@@ -6,7 +7,6 @@ from bs4 import BeautifulSoup
 import warnings
 from bs4 import XMLParsedAsHTMLWarning
 
-# XML-Warnungen unterdrücken
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 # -----------------------------
@@ -49,7 +49,6 @@ def load_history():
     except:
         return default
 
-    # Fehlende Schlüssel automatisch ergänzen
     for key in default:
         if key not in data:
             data[key] = []
@@ -70,7 +69,6 @@ def send_telegram(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     r = requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
     print("Telegram-Status:", r.status_code, r.text)
-
 
 # -----------------------------
 # PubMed
@@ -218,53 +216,48 @@ def detect_new_items(old_list, new_list):
 # Zusammenfassung
 # -----------------------------
 def summarize_results(pubmed, semantic, trials, news, orphanet):
-    msg = "🧬 Neue Entwicklungen seit dem letzten Lauf:\n\n"
-    msg += "🧬 PubMed:\n" + ("\n\n".join(f"- {p}" for p in pubmed) if pubmed else "- Keine neuen Studien.")
-    msg += "\n\n📘 Semantic Scholar:\n" + ("\n\n".join(f"- {s}" for s in semantic) if semantic else "- Keine neuen wissenschaftlichen Veröffentlichungen.")
-    msg += "\n\n🧪 Klinische Studien:\n" + ("\n\n".join(f"- {t}" for t in trials) if trials else "- Keine neuen klinischen Studien.")
-    msg += "\n\n📰 Nachrichten:\n" + ("\n\n".join(f"- {n}" for n in news) if news else "- Keine neuen Nachrichten.")
-    msg += "\n\n📚 Orphanet (Krankheitsinformationen):\n" + ("\n\n".join(f"- {o}" for o in orphanet) if orphanet else "- Keine neuen Informationen von Orphanet.")
+    msg = "🧬 Neue Entwicklungen:\n\n"
+    msg += "🧬 PubMed:\n" + ("\n\n".join(f"- {p}" for p in pubmed) if pubmed else "- Keine Studien.")
+    msg += "\n\n📘 Semantic Scholar:\n" + ("\n\n".join(f"- {s}" for s in semantic) if semantic else "- Keine Veröffentlichungen.")
+    msg += "\n\n🧪 Klinische Studien:\n" + ("\n\n".join(f"- {t}" for t in trials) if trials else "- Keine klinischen Studien.")
+    msg += "\n\n📰 Nachrichten:\n" + ("\n\n".join(f"- {n}" for n in news) if news else "- Keine Nachrichten.")
+    msg += "\n\n📚 Orphanet:\n" + ("\n\n".join(f"- {o}" for o in orphanet) if orphanet else "- Keine neuen Informationen.")
     return msg
 
-# # -----------------------------
+# -----------------------------
 # Hauptfunktion
 # -----------------------------
 def run_bmd_monitor():
-    # 1. History laden
     history = load_history()
 
-    # 2. Daten abrufen
     pubmed = search_pubmed()
     semantic = search_semantic_scholar()
     trials = search_clinicaltrials()
     news = search_medical_news()
     orphanet = search_orphanet()
 
-    # 3. Übersetzen
     pubmed = [translate_to_german(p) for p in pubmed]
     semantic = [translate_to_german(s) for s in semantic]
     trials = [translate_to_german(t) for t in trials]
     news = [translate_to_german(n) for n in news]
     orphanet = [translate_to_german(o) for o in orphanet]
 
-    # 4. Neue Einträge erkennen
     pubmed_new = detect_new_items(history["pubmed"], pubmed)
     semantic_new = detect_new_items(history["semantic"], semantic)
     trials_new = detect_new_items(history["trials"], trials)
     news_new = detect_new_items(history["news"], news)
     orphanet_new = detect_new_items(history["orphanet"], orphanet)
 
-    # 5. Zusammenfassung erstellen
-    summary = summarize_results(pubmed_new, semantic_new, trials_new, news_new, orphanet_new)
+    # Testmodus → immer vollständige Nachricht
+    if ALWAYS_SEND:
+        summary = summarize_results(pubmed, semantic, trials, news, orphanet)
+    else:
+        summary = summarize_results(pubmed_new, semantic_new, trials_new, news_new, orphanet_new)
+
     summary = translate_to_german(summary)
 
-    # 6. Nachricht senden (Testmodus oder echte neue Einträge)
-    if ALWAYS_SEND or any([pubmed_new, semantic_new, trials_new, news_new, orphanet_new]):
-        send_telegram(summary)
-    else:
-        print("Keine neuen Einträge – Nachricht nicht gesendet.")
+    send_telegram(summary)
 
-    # 7. History aktualisieren
     history["pubmed"] = pubmed
     history["semantic"] = semantic
     history["trials"] = trials
@@ -273,10 +266,12 @@ def run_bmd_monitor():
 
     save_history(history)
     print("Telegram-Benachrichtigung gesendet.")
-  # -----------------------------
+
+# -----------------------------
 # Startpunkt
 # -----------------------------
 if __name__ == "__main__":
     run_bmd_monitor()
+
 
 
