@@ -256,21 +256,19 @@ def run_bmd_monitor():
 
     summary = translate_to_german(summary)
 
-    print("Anzahl PubMed:", len(pubmed))
-    print("Anzahl Semantic:", len(semantic))
-    print("Anzahl Trials:", len(trials))
-    print("Anzahl News:", len(news))
-    print("Anzahl Orphanet:", len(orphanet))
-    print("Länge summary:", len(summary))
+    send_telegram(summary)
 
-send_telegram("Testnachricht:\n\n" + summary[:3000])
-  
+    history["pubmed"] = pubmed
+    history["semantic"] = semantic
+    history["trials"] = trials
+    history["news"] = news
+    history["orphanet"] = orphanet
+
+    save_history(history)
+    print("Telegram-Benachrichtigung gesendet.")
 
 # -----------------------------
 # Startpunkt
 # -----------------------------
 if __name__ == "__main__":
     run_bmd_monitor()
-
-
-
