@@ -227,56 +227,45 @@ def summarize_results(pubmed, semantic, trials, news, orphanet):
     msg += "\n\n📚 Orphanet (Krankheitsinformationen):\n" + ("\n\n".join(f"- {o}" for o in orphanet) if orphanet else "- Keine neuen Informationen von Orphanet.")
     return msg
 
-# -----------------------------
+# # -----------------------------
 # Hauptfunktion
 # -----------------------------
 def run_bmd_monitor():
+    # 1. History laden
     history = load_history()
 
-    # Daten abrufen
+    # 2. Daten abrufen
     pubmed = search_pubmed()
     semantic = search_semantic_scholar()
     trials = search_clinicaltrials()
     news = search_medical_news()
     orphanet = search_orphanet()
 
-    # Übersetzen
+    # 3. Übersetzen
     pubmed = [translate_to_german(p) for p in pubmed]
     semantic = [translate_to_german(s) for s in semantic]
     trials = [translate_to_german(t) for t in trials]
     news = [translate_to_german(n) for n in news]
     orphanet = [translate_to_german(o) for o in orphanet]
 
-    # Neue Einträge erkennen
-    summary = summarize_results(
-        detect_new_items(history["pubmed"], pubmed),
-        detect_new_items(history["semantic"], semantic),
-        detect_new_items(history["trials"], trials),
-        detect_new_items(history["news"], news),
-        detect_new_items(history["orphanet"], orphanet)
-    )
+    # 4. Neue Einträge erkennen
+    pubmed_new = detect_new_items(history["pubmed"], pubmed)
+    semantic_new = detect_new_items(history["semantic"], semantic)
+    trials_new = detect_new_items(history["trials"], trials)
+    news_new = detect_new_items(history["news"], news)
+    orphanet_new = detect_new_items(history["orphanet"], orphanet)
 
-    # Zusammenfassung selbst übersetzen
+    # 5. Zusammenfassung erstellen
+    summary = summarize_results(pubmed_new, semantic_new, trials_new, news_new, orphanet_new)
     summary = translate_to_german(summary)
 
-    # Neue Einträge erkennen
-pubmed_new = detect_new_items(history["pubmed"], pubmed)
-semantic_new = detect_new_items(history["semantic"], semantic)
-trials_new = detect_new_items(history["trials"], trials)
-news_new = detect_new_items(history["news"], news)
-orphanet_new = detect_new_items(history["orphanet"], orphanet)
+    # 6. Nachricht senden (Testmodus oder echte neue Einträge)
+    if ALWAYS_SEND or any([pubmed_new, semantic_new, trials_new, news_new, orphanet_new]):
+        send_telegram(summary)
+    else:
+        print("Keine neuen Einträge – Nachricht nicht gesendet.")
 
-# Zusammenfassung erstellen
-summary = summarize_results(pubmed_new, semantic_new, trials_new, news_new, orphanet_new)
-summary = translate_to_german(summary)
-
-# Nachricht senden (Testmodus oder echte neue Einträge)
-if ALWAYS_SEND or any([pubmed_new, semantic_new, trials_new, news_new, orphanet_new]):
-    send_telegram(summary)
-else:
-    print("Keine neuen Einträge – Nachricht nicht gesendet.")
-    
-    # History aktualisieren
+    # 7. History aktualisieren
     history["pubmed"] = pubmed
     history["semantic"] = semantic
     history["trials"] = trials
@@ -285,9 +274,3 @@ else:
 
     save_history(history)
     print("Telegram-Benachrichtigung gesendet.")
-
-# -----------------------------
-# Start
-# -----------------------------
-if __name__ == "__main__":
-    run_bmd_monitor()
