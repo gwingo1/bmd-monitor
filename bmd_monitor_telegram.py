@@ -1,3 +1,4 @@
+ALWAYS_SEND = True
 import requests
 import json
 import os
